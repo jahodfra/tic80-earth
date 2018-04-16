@@ -90,10 +90,107 @@ def convert_colors(source, colors):
     return source._new(target_im)
 
 
-def compress_bits(source):
+def image_to_bytes(source):
     w, h = source.size
     data = source.load()
-    data = bytes([data[x, y] for y in range(h) for x in range(w)])
+    return bytes([data[x, y] for y in range(h) for x in range(w)])
+
+
+def ident(x):
+    return x
+
+
+def meassure_compression(target):
+    print('Available space: ', 8192*2+32640)
+
+    for compress_func in (
+            ident, encode_6b_words, encode_rle_with_mask, encode_rle_2b_runs,
+            encode_lzw, encode_lz77):
+        print('{}: {} B'.format(
+            compress_func.__name__, len(compress_func(target))))
+
+
+def encode_rle(data, encode_repeat, max_chain):
+    mask = 32
+    if len(data) == 0:
+        return []
+
+    result = []
+    prev = data[0]
+    chain_size = 1
+    for d in data[1:]:
+        assert d < mask
+        if d == prev and chain_size <= max_chain:
+            chain_size += 1
+        elif chain_size == 1:
+            result.append(d)
+            chain_size = 1
+            prev = d
+        else:
+            result.extend(encode_repeat(d, chain_size))
+            chain_size = 1
+            prev = d
+    if chain_size == 1:
+        result.append(prev)
+    else:
+        result.extend(encode_repeat(prev, chain_size))
+    return result
+
+
+def encode_lz77(data):
+    max_window_size = 2**11
+    max_chain_size = 2**4
+    # top 1b is for marking literal
+    # TODO: finish
+    window = bytearray()
+    chain = bytearray()
+    result = []
+    stop = 255
+    for i, d in enumerate(data + bytes([stop])):
+        window = data[max(0, i-max_window_size) : i]
+        chain.append(d)
+        if d == stop or chain not in window or len(chain) > max_chain_size:
+            chain.pop()
+            start = window.find(chain)
+            size = len(chain)
+            if size > 0:
+                word = 1 << 31 | start << 6 | size-1
+                result.append(word // 256)
+                result.append(word % 256)
+            result.append(d)
+            chain = bytearray()
+    return result
+
+
+def encode_lzw(data):
+    lookup = {bytes([i]): i for i in range(32)}
+    result = []
+    chain = bytes()
+    table_size = 256**2
+    for d in data:
+        next_chain = chain + bytes([d])
+        if next_chain not in lookup:
+            result.append(lookup[chain] // 256)
+            result.append(lookup[chain] % 256)
+            if len(lookup) < table_size:
+                lookup[next_chain] = len(lookup)
+            chain = bytes([d])
+        else:
+            chain = next_chain
+    if chain:
+        result.append(lookup[chain])
+    return result
+
+
+def encode_rle_with_mask(data):
+    return encode_rle(data, lambda ch, size: [size+32, ch], 255-32)
+
+
+def encode_rle_2b_runs(data):
+    return encode_rle(data, lambda ch, size: [(size-1) << 5 + ch], 4)
+
+
+def encode_6b_words(data):
     res = []
     for d in data:
         res.append(d & 3)
@@ -192,7 +289,10 @@ def main():
 
     target.save('transformed.png')
 
-    data = compress_bits(target)
+    data = image_to_bytes(target)
+    meassure_compression(data)
+
+    data = encode_6b_words(data)
     write_cartridge(sys.argv[2], data, COLORS)
 
 
