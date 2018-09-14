@@ -10,47 +10,7 @@ import struct
 
 DIAMETER = 136
 
-COLORS = [c for c in '''
-#000000
-#040531
-#0d0b37
-#15143c
-
-#28294d
-#153b06
-#fad698
-#464766
-
-#3c5316
-#2a5a10
-#5b5a2b
-#725c36
-
-#f7fcac
-#8086a2
-#000010
-#09090a
-
-#a18256
-#c9cbd3
-#868898
-#84915a
-
-#d47b54
-#a6a494
-#c8a375
-#a7aab2
-
-#e5c49d
-#f4f5f3
-#cfcbc2
-#2a350c
-
-#64667f
-#596d32
-#f6eccd
-'''.split('\n') if c]
-
+from palette import COLORS
 
 def compute_palette(input_colors):
     palette = []
@@ -290,7 +250,7 @@ def main():
     target.save('transformed.png')
 
     data = image_to_bytes(target)
-    meassure_compression(data)
+    #meassure_compression(data)
 
     data = encode_6b_words(data)
     write_cartridge(sys.argv[2], data, COLORS)
