@@ -1,5 +1,5 @@
 # tic80-earth
-Rotating Earth for TIC-80
+[Rotating Earth for TIC-80](https://tic.computer/play?cart=487)
 
 ## Commands
 ```shell
